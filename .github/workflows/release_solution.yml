@@ -1,0 +1,76 @@
+# This Github workflow automates the process of releasing weekly homework solutions for MIDS-W203
+name: Homework Solution
+
+# Schedule the action
+on:
+  # The actions are scheduled by the following crontab. **All times are based in UTC**. The first two entries are minutes and hours (in UTC), and 
+  # the last entry is the day (0: Sunday, 1: Monday,..., 6: Saturday). 
+  # Example: 
+  #   Suppose that I want to release the homeworks every Wednesday at 7:30pm PST, i.e., Thursday at 2:30am UTC.
+  #   In the crontab, I would use '30 2 * * 4'. 
+  #   For more, go to https://crontab.guru/#30_2_*_*_4    
+  schedule:
+    # Time in UTC
+    - cron: '30 19 * * 4'
+      
+jobs:
+  solution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Define the start date
+        run: |
+          # This is the start date (in UTC) of the course. The workflow becomes effective only after this date. 
+          export START_DATE="2020-09-24"
+          echo "::set-env name=START_DATE::$START_DATE"
+          
+      - uses: actions/checkout@v2
+
+      - name: Clone instrutor_central repo
+        env: 
+          W203_SECRET: ${{ secrets.W203 }}
+        run: |
+          curl -H "Authorization: token $W203_SECRET" \
+          -H 'Accept: application/vnd.github.v3.raw' \
+          -O -L https://api.github.com/repos/mids-w203/instructor_central/zipball 
+        
+      - name: Unzip central, rename, and clean
+        run: |
+          unzip zipball
+          mv $(ls | grep mids) instructor_central
+          rm zipball
+          
+      - name: Create homework folder
+        run: mkdir -p homework
+
+      - name: Get the last unit and create the new unit
+        run: |
+          unit=$(ls homework | grep sol | tail -1 | cut -d'_' -f3)
+          if [ -z "$unit" ]
+          then
+            new_unit='01'
+          else
+            new_unit=`printf "%02d" $((${unit#0}+1))`
+          fi
+          export UNIT=$new_unit
+          echo "::set-env name=UNIT::$UNIT"
+          
+      - name: Copy the new homework and clean
+        run: |
+          cp -r "instructor_central/homework/solutions_unit_$UNIT" homework
+          rm -rf instructor_central  
+            
+      - name: Commit files     
+        run: |
+          # Change it to your email
+          git config --local user.email "action@github.com"
+          
+          # Change it to your name
+          git config --local user.name "GitHub Action"
+          
+          git add .
+          git commit -m "Release homework $UNIT"    
+      
+      - name: Push commit
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,29 @@
+# This Github workflow automates the process of releasing weekly homework for MIDS-W203
+name: Invite Members
+
+# Schedule the action
+on:
+  # Add the following line to manually trigger actions
+  workflow_dispatch: 
+      
+jobs:
+  invite:
+    runs-on: ubuntu-latest
+    steps:   
+      - name: Send invitation
+        env: 
+          MEMBERS: smajhi@tulane.edu,abcd@example.com
+          PERM: pull
+          W203_SECRET: ${{ secrets.W203 }}
+    
+        run: |
+          set -f
+          members=(${MEMBERS//,/ })
+          for i in "${!members[@]}"
+          do
+            username=`echo ${member[i]} | xargs`
+            curl -H "Authorization: token $W203_SECRET" \
+            -H 'Accept: application/vnd.github.v3.raw' \
+            https://api.github.com/repos/mids-w203/${{github.repository}}/collaborators/$username \
+            -d '{"permission":"$PERM"}'
+          done
